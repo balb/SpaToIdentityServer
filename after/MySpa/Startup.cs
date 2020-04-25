@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.SpaServices.ReactDevelopmentServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace MySpa
 {
@@ -20,6 +23,29 @@ namespace MySpa
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.Authority = "http://localhost:5000";
+                    options.RequireHttpsMetadata = false;
+                    options.Audience = "api1";
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateLifetime = false,
+                        NameClaimType = "name"
+                    };
+
+                    // Use options.Events for debugging auth issues. Set Events.OnAuthenticationFailed etc.
+                    // e.g. options.Events = new JwtBearerEvents { OnAuthenticationFailed = ... }
+                });
+
+            services.AddAuthorization(options =>
+            {
+                // This is required to enable [Authorize] attributes to work with JwtBearer tokens
+                options.DefaultPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
 
             services.AddControllersWithViews();
 
@@ -36,6 +62,9 @@ namespace MySpa
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+
+                // This is helpful for debugging access_token errors
+                IdentityModelEventSource.ShowPII = true;
             }
             else
             {
@@ -49,6 +78,7 @@ namespace MySpa
             app.UseSpaStaticFiles();
 
             app.UseRouting();
+            app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
